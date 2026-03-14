@@ -1,12 +1,12 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: users
-  namespace: users
+  name: devlift-trial-mumbai-01-navigation
+  namespace: nthelum-ns
   annotations:
     reloader.stakater.com/auto: 'true'
   labels:
-    app: users
+    app: devlift-trial-mumbai-01-navigation
 spec:
   replicas: 1
   strategy:
@@ -16,20 +16,20 @@ spec:
       maxUnavailable: 0
   selector:
     matchLabels:
-      app: users
+      app: devlift-trial-mumbai-01-navigation
   template:
     metadata:
       labels:
-        app: users
+        app: devlift-trial-mumbai-01-navigation
     spec:
-      serviceAccountName: users-sa
+      serviceAccountName: devlift-trial-mumbai-01-navigation-sa
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
         fsGroup: 2000
       containers:
-        - name: users
-          image: 443245368846.dkr.ecr.ap-south-1.amazonaws.com/users:IMAGE_TAG_PLACEHOLDER
+        - name: devlift-trial-mumbai-01-navigation
+          image: 443245368846.dkr.ecr.ap-south-1.amazonaws.com/devlift-trial-mumbai-01-navigation:IMAGE_TAG_PLACEHOLDER
           imagePullPolicy: Always
           ports:
             - name: http
@@ -38,11 +38,11 @@ spec:
 
           resources:
             requests:
-              cpu: "250m"
-              memory: "512Mi"
+              cpu: "200m"
+              memory: "200Mi"
             limits:
-              cpu: "500m"
-              memory: "1024Mi"
+              cpu: "200m"
+              memory: "200Mi"
           livenessProbe:
             httpGet:
               path: /health
