@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: users
+  name: nthelum-ns
   labels:
-    name: users
+    name: nthelum-ns
     environment: stage
