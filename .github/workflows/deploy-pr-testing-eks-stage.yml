@@ -1,0 +1,123 @@
+name: Deploy pr-testing-eks to stage
+
+run-name: >-
+  ${{ github.event.inputs.triggered_by_user != '' &&
+      format('Deploy pr-testing-eks to stage (requested by {0})', github.event.inputs.triggered_by_user)
+      ||
+      format('Deploy pr-testing-eks to stage')
+  }}
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '/pr-test-build'
+      - 'Dockerfile'
+      - '/pr-test-build'
+      - 'Dockerfile'
+      - 'pr-test-trigger'
+  workflow_dispatch:
+    inputs:
+      triggered_by_user:
+        description: "Email or name of the user triggering this workflow"
+        required: true
+
+jobs:
+  code-checkout:
+    name: Checkout Code
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+  code-quality-check:
+    name: Code Quality Check
+    needs: [code-checkout]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+          - name: Run Checkstyle
+            run: mvn checkstyle:check
+          - name: Run SpotBugs
+            run: mvn spotbugs:check
+          - name: Run PMD
+            run: mvn pmd:check
+  build:
+    name: Build Application
+    needs: [code-quality-check]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+          - name: Set up JDK
+            uses: actions/setup-java@v4
+            with:
+              distribution: 'temurin'
+              java-version: '21'
+              cache: 'maven'
+          - name: Download dependencies
+            run: mvn dependency:go-offline
+
+      - name: Build application
+        run: |
+          echo "Building pr-testing-eks for stage environment..."
+                  echo "Building Java application with Maven..."
+                  mvn clean package -DskipTests
+  docker-build:
+    name: Build Docker Image
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: |
+          echo "Building Docker image for pr-testing-eks..."
+          docker build -t ${{ github.repository }}:${{ github.sha }} .
+          docker tag ${{ github.repository }}:${{ github.sha }} ${{ github.repository }}:latest
+  deploy:
+    name: Deploy to EKS
+    needs: [docker-build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name vance-core-stage-mumbai-01-backend-cluster --region ap-south-1
+
+      - name: Deploy to EKS
+        run: |
+          echo "Deploying pr-testing-eks to stage environment in EKS cluster..."
+          # kubectl set image deployment/${{ github.repository }} ${{ github.repository }}=${{ github.sha }}
+          # kubectl rollout status deployment/${{ github.repository }}
