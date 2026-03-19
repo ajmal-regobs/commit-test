@@ -21,22 +21,32 @@ def get_db_connection():
     )
 
 
+_db_initialized = False
+
+
 def init_db():
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS entries (
-            id SERIAL PRIMARY KEY,
-            name VARCHAR(255) NOT NULL,
-            value VARCHAR(255) NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    global _db_initialized
+    if _db_initialized:
+        return
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS entries (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                value VARCHAR(255) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
         )
-        """
-    )
-    conn.commit()
-    cur.close()
-    conn.close()
+        conn.commit()
+        cur.close()
+        conn.close()
+        _db_initialized = True
+    except Exception:
+        pass
 
 
 @app.route("/")
@@ -51,6 +61,7 @@ def health():
 
 @app.route("/add")
 def add_entry():
+    init_db()
     name = request.args.get("name")
     value = request.args.get("value")
     if not name or not value:
@@ -68,6 +79,7 @@ def add_entry():
 
 @app.route("/entries")
 def get_entries():
+    init_db()
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("SELECT id, name, value, created_at FROM entries ORDER BY created_at DESC")
