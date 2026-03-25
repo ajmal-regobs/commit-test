@@ -1,0 +1,73 @@
+name: Deploy newuiecsservice to stage
+run-name: >-
+  ${{ github.event.inputs.triggered_by_user != '' &&
+      format('Deploy newuiecsservice to stage (requested by {0})', github.event.inputs.triggered_by_user)
+      ||
+      format('Deploy newuiecsservice to stage')
+  }}
+
+on:
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+    inputs:
+      triggered_by_user:
+        description: "Email or name of the user triggering this workflow"
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REPOSITORY: 878097483768.dkr.ecr.ap-south-1.amazonaws.com/vance-core/stage/mumbai/01/newuiecsservice-service
+  SERVICE_NAME: newuiecsservice
+  ENVIRONMENT: stage
+
+jobs:
+  build-and-deploy:
+    runs-on: [self-hosted, aws]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5.1.0
+        with:
+          role-to-assume: arn:aws:iam::878097483768:role/github-actions-role
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: Devlift-${{ github.run_id }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build \
+            --file Dockerfile \
+            -t ${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }} .
+          docker tag ${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }} ${{ env.ECR_REPOSITORY }}:latest
+          docker push ${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+          docker push ${{ env.ECR_REPOSITORY }}:latest
+          echo "image=${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}" >> $GITHUB_OUTPUT
+
+      - name: Force ECS Deployment
+        run: |
+          echo "Forcing new deployment for ECS service..."
+          aws ecs update-service \
+            --cluster vance-core-stage-mumbai-01-backend-cluster \
+            --service vance-core-stage-mumbai-01-newuiecsservice-service-svc \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
+
+          echo "Deployment triggered successfully!"
+          echo "Service: vance-core-stage-mumbai-01-newuiecsservice-service-svc"
+          echo "Cluster: vance-core-stage-mumbai-01-backend-cluster"
