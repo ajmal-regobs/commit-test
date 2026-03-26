@@ -1,0 +1,54 @@
+name: Stage Pipeline - Java Application
+
+on:
+  push:
+    branches:
+      - feature/infra/ajmal-regobs-commit-test-feature-infra-ajmal-regobs-commit-test-main-4a8194b0-d52acda0
+  workflow_dispatch:
+
+jobs:
+  load-config:
+    name: Load Configuration
+    uses: Vance-Club/shared-lib/.github/workflows/load-config.yaml@main
+    with:
+      config_path: configs/stage/config-test-2-eks-canvas.yaml
+
+  code-quality:
+    name: Code Quality Check
+    needs: [load-config]
+    uses: Vance-Club/shared-lib/.github/workflows/code-quality.yaml@main
+    with:
+      config: ${{ needs.load-config.outputs.config }}
+      runner: ${{ needs.load-config.outputs.runner }}
+      skip_code_quality: false
+
+  build:
+    name: Build Image
+    needs: [load-config, code-quality]
+    uses: Vance-Club/shared-lib/.github/workflows/build.yaml@main
+    with:
+      config: ${{ needs.load-config.outputs.config }}
+      runner: ${{ needs.load-config.outputs.runner }}
+      skip_snyk_code: false
+      skip_snyk_oss: false
+      skip_snyk_container: false
+    secrets: inherit
+
+  slack-notification:
+    name: Send Slack Notification
+    needs: [load-config, code-quality, build]
+    if: always()
+    uses: Vance-Club/shared-lib/.github/workflows/slack-alerts.yaml@main
+    with:
+      job_status: >-
+        ${{
+          (needs.code-quality.result == 'failure' || needs.build.result == 'failure') && 'failure' ||
+          (needs.code-quality.result == 'success' && needs.build.result == 'success') && 'success' ||
+          'cancelled'
+        }}
+      config: ${{ needs.load-config.outputs.config }}
+      runner: ${{ needs.load-config.outputs.runner }}
+      vulnerability_summary: ${{ needs.build.outputs.vulnerability_summary }}
+      artifact_url: ${{ needs.build.outputs.artifact_url }}
+    secrets:
+      ARC_SLACK_BOT_TOKEN: ${{ secrets.ARC_SLACK_BOT_TOKEN }}
