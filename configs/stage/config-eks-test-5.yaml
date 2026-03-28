@@ -1,0 +1,16 @@
+# Service name (identifier) - used to derive ECR repo, EKS deployment names, etc.
+service_name: eks-test-5
+
+language: python
+python_version: "3.10"
+# aws_region: [ ap-south-1, eu-west-2, us-east-1 ]
+
+# Path to Dockerfile (relative to repo root)
+dockerfile_path: Dockerfile
+
+# Build configuration
+build:
+  type: docker-only
+  skip_tests: true
+  skip_checks: true
+
