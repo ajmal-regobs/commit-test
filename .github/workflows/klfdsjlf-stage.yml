@@ -1,0 +1,96 @@
+name: Deploy klfdsjlf to stage
+run-name: >-
+  ${{ github.event.inputs.triggered_by_user != '' &&
+      format('Deploy klfdsjlf to stage (requested by {0})', github.event.inputs.triggered_by_user)
+      ||
+      format('Deploy klfdsjlf to stage')
+  }}
+
+on:
+  push:
+    branches:
+      - feature/infra/ajmal-regobs-commit-test-test2-f962c6ea
+
+  workflow_dispatch:
+    inputs:
+      triggered_by_user:
+        description: "Email or name of the user triggering this workflow"
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REPOSITORY: 878097483768.dkr.ecr.ap-south-1.amazonaws.com/vance-core/stage/mumbai/01/klfdsjlf-service
+  SERVICE_NAME: vance-core-stage-mumbai-01-klfdsjlf-service-svc
+  ENVIRONMENT: stage
+  ECS_CLUSTER: vance-core-stage-mumbai-01-backend-cluster
+
+jobs:
+  build-and-deploy:
+    runs-on: [self-hosted, aws]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5.1.0
+        with:
+          role-to-assume: arn:aws:iam::878097483768:role/github-actions-role
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: Devlift-${{ github.run_id }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
+        with:
+          java-version: 11
+          distribution: 'temurin'
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.gradle/caches
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle') }}
+          restore-keys: ${{ runner.os }}-gradle
+
+      - name: Build JAR
+        run: |
+          ./gradlew clean build -x test
+        env:
+          PACKAGES_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
+          PACKAGES_USER: ${{ secrets.PACKAGES_USER }}
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build \
+            --build-arg JAR_FILE=build/libs/*.jar \
+            --build-arg PROFILE=${{ env.ENVIRONMENT }} \
+            --file Dockerfile \
+            -t ${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }} .
+          docker tag ${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }} ${{ env.ECR_REPOSITORY }}:latest
+          docker push ${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+          docker push ${{ env.ECR_REPOSITORY }}:latest
+          echo "image=${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}" >> $GITHUB_OUTPUT
+
+      - name: Force ECS Deployment
+        run: |
+          echo "Forcing new deployment for ECS service..."
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ env.SERVICE_NAME }} \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
+
+          echo "Deployment triggered successfully!"
+          echo "Service: ${{ env.SERVICE_NAME }}"
+          echo "Cluster: ${{ env.ECS_CLUSTER }}"
