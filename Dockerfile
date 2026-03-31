@@ -1,20 +1,16 @@
-FROM python:3.12-slim
+FROM eclipse-temurin:11-jdk
 
-WORKDIR /app
+ARG JAR_FILE
+ARG PROFILE
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
+ENV profile=$PROFILE
+ENV APP_HOME=/usr/app/
 
-# Copy requirements first for better caching
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+WORKDIR $APP_HOME
 
-# Copy application code
-COPY . .
+COPY ${JAR_FILE} /app.jar
+RUN chmod 755 /app.jar
 
-ENV APP_PORT=6666
-EXPOSE 6666
+ENV JAVA_TOOL_OPTIONS="-Dlogging.level.root=info"
 
-CMD ["python", "main.py"]
+ENTRYPOINT ["sh", "-c", "java -jar /app.jar --spring.profiles.active=${profile}"]
