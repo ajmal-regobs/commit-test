@@ -1,0 +1,126 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: default
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pr-testing-eks
+  namespace: default
+  annotations:
+    reloader.stakater.com/auto: 'true'
+  labels:
+    app: pr-testing-eks
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: pr-testing-eks
+  template:
+    metadata:
+      labels:
+        app: pr-testing-eks
+    spec:
+      serviceAccountName: pr-testing-eks-sa
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+      containers:
+        - name: pr-testing-eks
+          image: /pr-testing-eks:${IMAGE_TAG}
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 2122
+          env:
+            - name: K8S_POD_UID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+            - name: K8S_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+
+          resources:
+            requests:
+              cpu: "212m"
+              memory: "121Mi"
+            limits:
+              cpu: "212m"
+              memory: "121Mi"
+          livenessProbe:
+            httpGet:
+              path: /pr-test-eks-helath
+              port: 2122
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+          readinessProbe:
+            httpGet:
+              path: /pr-test-eks-helath
+              port: 2122
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pr-testing-eks
+  namespace: default
+  labels:
+    app: pr-testing-eks
+spec:
+  type: ClusterIP
+  selector:
+    app: pr-testing-eks
+  ports:
+  - name: http
+    port: 2122
+    targetPort: 2122
+    protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pr-testing-eks-ingress
+  namespace: default
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    alb.ingress.kubernetes.io/certificate-arn: 
+    alb.ingress.kubernetes.io/manage-backend-security-group-rules: 'true'
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
+    alb.ingress.kubernetes.io/healthcheck-path: /pr-test-eks-helath
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '30'
+    alb.ingress.kubernetes.io/success-codes: '200'
+spec:
+  ingressClassName: alb
+  rules:
+  - host:
+    http:
+      paths:
+      - path: /*
+        pathType: Prefix
+        backend:
+          service:
+            name: pr-testing-eks-service
+            port:
+              number: 2122

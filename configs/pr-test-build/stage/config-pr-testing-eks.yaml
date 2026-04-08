@@ -1,0 +1,50 @@
+# Service name (identifier) - used to derive ECR repo, EKS deployment names, etc.
+service_name: pr-testing-eks
+
+language: java
+java_version: "11"
+# aws_region: [ ap-south-1, eu-west-2, us-east-1 ]
+
+# Path to Dockerfile (relative to repo root)
+dockerfile_path: Dockerfile
+
+# Build configuration
+build:
+  type: maven
+  skip_tests: true
+  skip_checks: true
+  maven:
+    jar_file: /pr-test-build/target/*.jar
+    goals: "clean package"
+    repo_id: github
+    repo_name: java-commons
+    repo_url: https://maven.pkg.github.com/Vance-Club/java-commons
+    profile: stg
+
+# Resource Allocation
+resources:
+  cpu_requested: "212m"
+  cpu_limit: "212m"
+  memory_requested: "121Mi"
+  memory_limit: "121Mi"
+  container_port: 2122
+  replica_count: 1
+  hpa:
+    enabled: false
+  ebs:
+    enabled: false
+
+# Service Configuration
+service:
+  alb_schema: "internet-facing"
+  service_path: "/*"
+  secrets:
+    enabled: false
+
+# Deployment Strategy Configuration
+deployment:
+  strategy: rolling
+  rolling:
+    maxSurge: "25%"
+    maxUnavailable: "25%"
+
