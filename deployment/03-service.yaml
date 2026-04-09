@@ -1,14 +1,14 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: users-service
-  namespace: users
+  name: gketenant-trial-mumbai-01-users-service
+  namespace: gketenant-ns
   labels:
-    app: users
+    app: gketenant-trial-mumbai-01-users
 spec:
   type: ClusterIP
   selector:
-    app: users
+    app: gketenant-trial-mumbai-01-users
   ports:
   - name: http
     port: 3333
