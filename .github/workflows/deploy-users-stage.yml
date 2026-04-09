@@ -28,7 +28,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v5.1.0
         with:
-          role-to-assume: arn:aws:iam::443245368846:role/devlift-deploy-role
+          role-to-assume: arn:aws:iam::443245368846:role/gketenant-deploy-role
           aws-region: ${{ env.AWS_REGION }}
           role-session-name: Devlift-${{ github.run_id }}
 
@@ -72,11 +72,11 @@ jobs:
       - name: Verify deployment
         run: |
           echo "Checking pod status..."
-          kubectl get pods --namespace=${{ env.SERVICE_NAME }}
+          kubectl get pods --namespace=users
 
           echo "Waiting for ALB to provision..."
           for i in {1..30}; do
-            ALB_URL=$(kubectl get ingress ${{ env.SERVICE_NAME }}-ingress --namespace=${{ env.SERVICE_NAME }} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+            ALB_URL=$(kubectl get ingress ${{ env.SERVICE_NAME }}-ingress --namespace=users -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
             if [ -n "$ALB_URL" ]; then
               echo "ALB provisioned successfully!"
               echo "ALB URL: http://$ALB_URL"
@@ -87,4 +87,4 @@ jobs:
           done
 
           echo "ALB provisioning timeout. Check ingress status:"
-          kubectl describe ingress ${{ env.SERVICE_NAME }}-ingress --namespace=${{ env.SERVICE_NAME }}
+          kubectl describe ingress ${{ env.SERVICE_NAME }}-ingress --namespace=users

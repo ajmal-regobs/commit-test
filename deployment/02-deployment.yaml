@@ -1,12 +1,12 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: users
-  namespace: users
+  name: gketenant-trial-mumbai-01-users
+  namespace: gketenant-ns
   annotations:
     reloader.stakater.com/auto: 'true'
   labels:
-    app: users
+    app: gketenant-trial-mumbai-01-users
 spec:
   replicas: 1
   strategy:
@@ -16,20 +16,31 @@ spec:
       maxUnavailable: 0
   selector:
     matchLabels:
-      app: users
+      app: gketenant-trial-mumbai-01-users
   template:
     metadata:
       labels:
-        app: users
+        app: gketenant-trial-mumbai-01-users
+        devlift.ai/tenant: gketenant
+        devlift.ai/environment: stage
+        devlift.ai/service: gketenant-trial-mumbai-01-users
     spec:
-      serviceAccountName: users-sa
+      serviceAccountName: gketenant-trial-mumbai-01-users-sa
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: eks.amazonaws.com/instance-category
+                    operator: NotIn
+                    values: ["g", "p"]
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
         fsGroup: 2000
       containers:
-        - name: users
-          image: 443245368846.dkr.ecr.ap-south-1.amazonaws.com/users:IMAGE_TAG_PLACEHOLDER
+        - name: gketenant-trial-mumbai-01-users
+          image: 443245368846.dkr.ecr.ap-south-1.amazonaws.com/gketenant-trial-mumbai-01-users:IMAGE_TAG_PLACEHOLDER
           imagePullPolicy: Always
           ports:
             - name: http
@@ -38,10 +49,10 @@ spec:
 
           resources:
             requests:
-              cpu: "250m"
+              cpu: "500m"
               memory: "512Mi"
             limits:
-              cpu: "500m"
+              cpu: "1000m"
               memory: "1024Mi"
           livenessProbe:
             httpGet:
